@@ -1,0 +1,33 @@
+# Збірка
+bin/
+obj/
+dist/
+publish/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+# Дані агента та застосунку: особиста інформація, ніколи не комітити
+logs/
+*.log
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+data/
+settings.json
+url.txt
+zs-origin.json
+
+# Згенеровані сторінки дашборда (містять дані)
+*.out.html
+check*.html
+
+# Системне
+Thumbs.db
+Desktop.ini
+.DS_Store

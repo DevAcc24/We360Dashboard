@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>We360Dashboard</AssemblyName>
+    <!-- версія: основна.проміжна змінюється тут; номер збірки підставляє CI (номер запуску GitHub Actions), локально 0 -->
+    <VersionPrefix>1.0</VersionPrefix>
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    <Version>$(VersionPrefix).$(BuildNumber)</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- один exe, без потреби ставити .NET на комп'ютер -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- вбудований у Windows winsqlite3.dll: жодних native-бібліотек, які треба розпаковувати в %TEMP% -->
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="11.0.0" />
+    <PackageReference Include="SQLitePCLRaw.provider.winsqlite3" Version="3.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- шаблон сторінки дашборда -->
+    <EmbeddedResource Include="dashboard_template.html" LogicalName="dashboard_template.html" />
+    <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
+  </ItemGroup>
+
+</Project>

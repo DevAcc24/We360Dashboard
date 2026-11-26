@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Моя статистика we360</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface-1: #fcfcfb; --border: rgba(11,11,11,0.10);
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7;
+  --active: #2a78d6; --idle: #c3c2b7; --lock: #898781;
+  --s1:#2a78d6;
+  --q1:#cde2fb; --q2:#86b6ef; --q3:#3987e5; --q4:#1c5cab; --q5:#0d366b;
+  --critical: #d03b3b; --hover: rgba(11,11,11,0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface-1: #1a1a19; --border: rgba(255,255,255,0.10);
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835;
+    --active: #3987e5; --idle: #4a4a46; --lock: #898781;
+    --s1:#3987e5;
+    --q1:#184f95; --q2:#256abf; --q3:#3987e5; --q4:#6da7ec; --q5:#b7d3f6;
+    --hover: rgba(255,255,255,0.06);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text-primary);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1280px; margin: 0 auto; padding: 24px 20px 60px; }
+header { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 24px; justify-content: space-between; margin-bottom: 16px; }
+h1 { font-size: 22px; margin: 0; font-weight: 650; }
+.sub { color: var(--text-secondary); font-size: 13px; }
+.filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface-1); }
+.seg button { border: 0; background: none; color: var(--text-secondary); padding: 6px 12px; font: inherit; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--hover); color: var(--text-primary); font-weight: 600; }
+.period { display: inline-flex; gap: 6px; align-items: center; color: var(--text-secondary); }
+.period[hidden] { display: none; }
+.period input { border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); padding: 5px 8px; font: inherit; }
+label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--text-secondary); cursor: pointer; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.tile, .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; }
+.tile { padding: 14px 16px; }
+.tile .lbl { color: var(--text-secondary); font-size: 12.5px; }
+.tile .val { font-size: 26px; font-weight: 650; margin: 2px 0; }
+.tile .note { color: var(--muted); font-size: 12px; }
+.card { padding: 16px 18px; margin-bottom: 12px; }
+.card h2 { font-size: 15px; margin: 0 0 2px; font-weight: 650; }
+.card .desc { color: var(--text-secondary); font-size: 12.5px; margin-bottom: 10px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.grid2 > .card { margin-bottom: 0; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.legend i.line { height: 2px; vertical-align: 3px; }
+svg { display: block; width: 100%; overflow: visible; }
+svg text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+svg text.ink { fill: var(--text-secondary); }
+svg text.ink1 { fill: var(--text-primary); }
+.hit { fill: transparent; cursor: default; }
+.hit:hover { fill: var(--hover); }
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.15);
+  display: none; max-width: 360px; }
+#tip b { display: block; margin-bottom: 3px; }
+#tip div { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
+th { color: var(--text-secondary); font-weight: 600; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+td.t { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details summary { cursor: pointer; color: var(--text-secondary); margin-top: 6px; }
+.scroll { max-height: 420px; overflow: auto; }
+.badge { display: inline-flex; align-items: center; gap: 6px; color: var(--text-primary); font-weight: 600; }
+.badge::before { content: "!"; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--critical); color: #fff; font-size: 11px; font-weight: 700; }
+.empty { color: var(--muted); padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Моя статистика we360</h1>
+      <div class="sub" id="meta"></div>
+    </div>
+    <div class="filters">
+      <div class="seg" id="range">
+        <button data-r="1">1 день</button><button data-r="7">7 днів</button><button data-r="14">14 днів</button><button data-r="30">30 днів</button><button data-r="all">Усе</button><button data-r="custom">Період…</button>
+      </div>
+      <span class="period" id="period" hidden title="Довільний період">
+        <input type="date" id="from" aria-label="Початок періоду"> – <input type="date" id="to" aria-label="Кінець періоду">
+      </span>
+      <label class="chk"><input type="checkbox" id="wk"> лише будні</label>
+      <label class="chk" title="Дні, коли відстежено менше 2 годин, не враховуються в середніх, медіанах і графіках за годинами та днями тижня"><input type="checkbox" id="short"> без коротких днів</label>
+    </div>
+  </header>
+
+  <p class="sub" style="margin:-6px 0 14px">Це сирі дані з локальної бази й логів агента, без жодних оцінок. Продуктивність, категорії програм і правила обліку часу we360 рахує на сервері, і їх тут немає. Тому цифри на офіційному дашборді можуть відрізнятися.</p>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card">
+    <h2>Робочий час по днях</h2>
+    <div class="desc">Відстежений час: активний (є рух миші чи натискання клавіш) і неактивний (агент працює, але вводу немає). Пунктир показує середнє за робочий день.</div>
+    <div class="legend"><span><i style="background:var(--active)"></i>Активний</span><span><i style="background:var(--idle)"></i>Неактивний</span><span><i class="line" style="background:var(--text-secondary)"></i>Середнє</span></div>
+    <div id="daily"></div>
+  </section>
+
+  <section class="card">
+    <h2>Мапа робочого часу</h2>
+    <div class="desc">Кожен рядок — день, кожна клітинка — 5 хвилин. Чим темніша клітинка, тим більша частка активного часу в ній. Сіра лінія — екран заблоковано.</div>
+    <div class="legend" id="mapLegend"></div>
+    <div id="map"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Активність за годинами доби</h2>
+      <div class="desc">Середній активний і неактивний час у кожній годині, хвилин на робочий день.</div>
+      <div class="legend"><span><i style="background:var(--active)"></i>Активний</span><span><i style="background:var(--idle)"></i>Неактивний</span></div>
+      <div id="hours"></div>
+    </section>
+    <section class="card">
+      <h2>За днями тижня</h2>
+      <div class="desc">Середній відстежений час за день із даними.</div>
+      <div class="legend"><span><i style="background:var(--active)"></i>Активний</span><span><i style="background:var(--idle)"></i>Неактивний</span></div>
+      <div id="weekday"></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Програми</h2>
+      <div class="desc">Топ за часом, коли програма була у фокусі.</div>
+      <div id="apps"></div>
+    </section>
+    <section class="card">
+      <h2>Сайти</h2>
+      <div class="desc">Домени з адресного рядка браузера, за часом у фокусі.</div>
+      <div id="domains"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Вікна, у яких я провів найбільше часу</h2>
+    <div class="desc">Заголовки вікон за часом у фокусі.</div>
+    <div class="scroll" id="titles"></div>
+  </section>
+
+  <section class="card">
+    <h2>Події безпеки, зафіксовані агентом</h2>
+    <div class="desc">Записи з таблиці security_events. Агент позначає їх як синхронізовані, тобто ці події, найімовірніше, бачить і роботодавець.</div>
+    <div id="security"></div>
+  </section>
+
+  <section class="card">
+    <h2>Таблиця по днях</h2>
+    <div class="desc">Ті самі дані, що й на графіках. Дні з позначкою «лог» відновлено з логів агента: у базі їх уже немає, тому для них немає розбивки за програмами. «База + лог» означає, що база покриває лише частину дня, а решту доповнено з логів.</div>
+    <div class="scroll" id="table"></div>
+  </section>
+</main>
+<div id="tip"></div>
+
+<script>
+const D = /*__DATA__*/null;
+const NS = 'http://www.w3.org/2000/svg';
+const WD = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
+const WD_ORDER = [1,2,3,4,5,6,0];
+const SEQ = ['var(--q1)','var(--q2)','var(--q3)','var(--q4)','var(--q5)'];
+
+const state = { range: 'all', weekdaysOnly: false, skipShort: false };
+const SRC_LABEL = { 1: 'база', 2: 'лог', 3: 'база + лог' };
+const SHORT_DAY = 2*3600; // «короткий» день для перемикача «без коротких днів», с
+
+// ---------- helpers ----------
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs||{}) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs, text) { const e = document.createElement(tag); for (const k in attrs||{}) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
+function txt(parent, x, y, s, attrs) { const t = el('text', Object.assign({x, y}, attrs||{}), parent); t.textContent = s; return t; }
+const pad2 = n => String(n).padStart(2,'0');
+function fmtH(sec) { const m = Math.round(sec/60); return `${Math.floor(m/60)}:${pad2(m%60)}`; }
+function fmtHL(sec) { const m = Math.round(sec/60); const hh = Math.floor(m/60), mm = m%60; return hh ? `${hh} год ${mm} хв` : `${mm} хв`; }
+// хвилини доби як «Г:ХХ»; кінець дня рівно опівночі (1440) показуємо як 23:59, а не 24:00
+function fmtClock(min) { if (min == null) return '—'; min = Math.min(Math.round(min), 1439); return `${Math.floor(min/60)}:${pad2(min%60)}`; }
+function dayOfWeek(d) { return new Date(d + 'T12:00:00Z').getUTCDay(); }
+function fmtDay(d) { return `${WD[dayOfWeek(d)]} ${d.slice(8,10)}.${d.slice(5,7)}`; }
+function minOfDay(iso) { return +iso.slice(11,13)*60 + +iso.slice(14,16) + +iso.slice(17,19)/60; }
+function dayNum(d) { return Date.parse(d) / 864e5; } // номер дня; рядок 'YYYY-MM-DD' браузер читає як UTC
+function dayStr(n) { return new Date(n * 864e5).toISOString().slice(0,10); }
+const fmtN = new Intl.NumberFormat('uk').format;
+const pct = (part, whole) => Math.round(part/whole*100) + '%';
+const sum = (list, key) => list.reduce((a, p) => a + p[key], 0);
+function empty(host, text = 'Немає даних') { host.replaceChildren(h('div', {class:'empty'}, text)); }
+// групує рядки за ключем, підсумовує поля fields і повертає n найбільших за полем v
+function topBy(rows, keyOf, init, fields, n) {
+  const g = new Map();
+  for (const r of rows) {
+    const k = keyOf(r); if (k == null) continue;
+    let a = g.get(k); if (!a) g.set(k, a = init(r));
+    for (const [f, i] of fields) a[f] += r[i];
+  }
+  return [...g.values()].sort((a, b) => b.v - a.v).slice(0, n);
+}
+function addDays(d, n) { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate()+n); return t.toISOString().slice(0,10); }
+function median(a) { if (!a.length) return null; const s = [...a].sort((x,y)=>x-y); const m = s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1,2,2.5,5,10]) if (m*p >= v) return m*p; return 10*p; }
+function barTop(x, y, w, hgt, r) { // прямокутник із заокругленим верхом
+  r = Math.min(r, w/2, hgt); if (hgt <= 0) return '';
+  return `M${x},${y+hgt}V${y+r}Q${x},${y} ${x+r},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+hgt}Z`;
+}
+// стовпець із двох частин: активний час знизу, неактивний зверху (y0 - низ, ya - межа частин, yt - верх)
+function drawStack(svg, x, w, y0, ya, yt, hasActive, hasIdle) {
+  const gap = hasActive && hasIdle ? 2 : 0;
+  if (hasIdle) el('path', {d: barTop(x, yt, w, ya - yt - gap, 3), fill:'var(--idle)'}, svg);
+  if (hasActive) el('path', {d: hasIdle ? `M${x},${y0}V${ya}H${x+w}V${y0}Z` : barTop(x, ya, w, y0 - ya, 3), fill:'var(--active)'}, svg);
+}
+function barRight(x, y, w, hgt, r) {
+  r = Math.min(r, hgt/2, w); if (w <= 0) return '';
+  return `M${x},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+hgt-r}Q${x+w},${y+hgt} ${x+w-r},${y+hgt}H${x}Z`;
+}
+
+const tip = document.getElementById('tip');
+function showTip(ev, title, lines) {
+  tip.replaceChildren(h('b', {}, title), ...lines.map(l => h('div', {}, l)));
+  tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+// lines - масив рядків або функція, яка їх поверне (тоді текст складається лише при наведенні)
+function hover(node, title, lines) {
+  node.addEventListener('mousemove', ev => showTip(ev, title, typeof lines === 'function' ? lines() : lines));
+  node.addEventListener('mouseleave', hideTip);
+}
+
+// ---------- data model ----------
+const allDaysWithData = [...new Set(D.intervals.map(r => r[0].slice(0,10)))].sort();
+const firstDay = allDaysWithData[0], lastDay = allDaysWithData[allDaysWithData.length-1];
+
+// межі обраного періоду [початок, кінець] включно
+function rangeBounds() {
+  if (state.range === 'custom') return [state.from, state.to];
+  if (state.range === 'all') return [firstDay, lastDay];
+  const s = addDays(lastDay, -(+state.range - 1));
+  return [s > firstDay ? s : firstDay, lastDay];
+}
+
+// виправляє довільний період: у межах наявних даних, початок ≤ кінець; changed - яке поле міняли
+function clampPeriod(changed) {
+  const clamp = d => d < firstDay ? firstDay : d > lastDay ? lastDay : d;
+  let f = clamp(state.from || firstDay), t = clamp(state.to || lastDay);
+  if (changed === 'to') { if (f > t) f = t; }
+  else if (t < f) t = f;
+  state.from = f; state.to = t;
+  const fi = document.getElementById('from'), ti = document.getElementById('to');
+  fi.value = f; ti.value = t;
+  fi.min = firstDay; fi.max = lastDay; ti.min = firstDay; ti.max = lastDay;
+}
+
+function selectedDays() {
+  const [start, end] = rangeBounds();
+  const out = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const wd = dayOfWeek(d);
+    if (state.weekdaysOnly && (wd === 0 || wd === 6)) continue;
+    out.push(d);
+  }
+  return out;
+}
+
+function compute() {
+  const days = selectedDays();
+  const set = new Set(days);
+  const per = Object.fromEntries(days.map(d => [d, { d, dur:0, act:0, idle:0, keys:0, clicks:0, first:null, last:null, src:0,
+      hAct: new Array(24).fill(0), hIdle: new Array(24).fill(0)}]));
+  const ivs = [];
+  for (const r of D.intervals) {
+    const d = r[0].slice(0,10); if (!set.has(d)) continue;
+    const [iso, dur, act, idle, keys, clicks, src] = r;
+    const p = per[d]; ivs.push(r);
+    p.dur += dur; p.act += act; p.idle += idle; p.keys += keys; p.clicks += clicks; p.src |= src ? 2 : 1; // 1 - база, 2 - логи, 3 - і те, і те
+    const m0 = minOfDay(iso), m1 = m0 + dur/60;
+    if (p.first == null || m0 < p.first) p.first = m0;
+    if (p.last == null || m1 > p.last) p.last = m1;
+    // рознести по годинах пропорційно перетину
+    for (let hh = Math.floor(m0/60); hh <= Math.min(23, Math.floor((m1-1e-9)/60)); hh++) {
+      const ov = Math.max(0, Math.min(m1, (hh+1)*60) - Math.max(m0, hh*60));
+      const frac = dur > 0 ? ov*60/dur : 0;
+      p.hAct[hh] += act*frac; p.hIdle[hh] += idle*frac;
+    }
+  }
+  const apps = D.apps.filter(r => set.has(r[0]));
+  const withData = days.filter(d => per[d].dur > 0);
+  // дні, з яких рахуються середні; без перемикача - усі дні з даними
+  const worked = state.skipShort ? withData.filter(d => per[d].dur >= SHORT_DAY) : withData;
+  const sec = D.security.filter(r => set.has(r[0].slice(0,10)));
+  return { days, per, withData, worked, apps, sec, ivs };
+}
+
+// ---------- KPI ----------
+function renderKpis(M) {
+  const box = document.getElementById('kpis'); box.replaceChildren();
+  const A = M.withData.map(d => M.per[d]), W = M.worked.map(d => M.per[d]);
+  const dur = sum(A, 'dur'), act = sum(A, 'act'), keys = sum(A, 'keys'), clicks = sum(A, 'clicks');
+  const n = W.length || 1, skipped = A.length - W.length;
+  const jig = M.sec.filter(r => /jiggl/i.test(r[1] + ' ' + r[2])).length;
+  const tiles = [
+    ['Відстежено', fmtH(dur), `${A.length} дн. з даними`],
+    ['Середній день', fmtH(sum(W, 'dur')/n), `з них активно ${fmtH(sum(W, 'act')/n)}` + (skipped ? ` · без ${skipped} коротких дн.` : '')],
+    ['Частка активного часу', dur ? pct(act, dur) : '—', `активно всього ${fmtH(act)}`],
+    ['Типовий початок / кінець', `${fmtClock(median(W.map(p=>p.first)))}–${fmtClock(median(W.map(p=>p.last)))}`, 'медіана по днях'],
+    ['Ввід за активну годину', act ? fmtN(Math.round(keys/(act/3600))) : '—', `клавіш; кліків ${act ? Math.round(clicks/(act/3600)) : '—'}`],
+    ['Події безпеки', String(M.sec.length), M.sec.length ? `з них mouse jiggler: ${jig} · останнє ${M.sec[M.sec.length-1][0].slice(0,10)}` : 'немає за період'],
+  ];
+  for (const [l, v, nt] of tiles) {
+    const t = h('div', {class:'tile'}); t.append(h('div',{class:'lbl'},l), h('div',{class:'val'},v), h('div',{class:'note'},nt)); box.append(t);
+  }
+}
+
+// ---------- daily stacked bars ----------
+function renderDaily(M) {
+  const host = document.getElementById('daily'); host.replaceChildren();
+  const W = host.clientWidth || 900, H = 240, ml = 36, mr = 8, mt = 10, mb = 34;
+  const svg = el('svg', {viewBox:`0 0 ${W} ${H}`, height: H}, host);
+  const days = M.days; if (!days.length) return;
+  const max = niceMax(Math.max(...days.map(d => M.per[d].dur/3600), 1));
+  const y = v => mt + (H-mt-mb) * (1 - v/max);
+  const bw = (W-ml-mr)/days.length, w = Math.max(2, Math.min(36, bw*0.7));
+  const step = max <= 4 ? 1 : max <= 10 ? 2 : max <= 20 ? 4 : 5;
+  for (let v = 0; v <= max + 1e-9; v += step) {
+    el('line', {x1:ml, x2:W-mr, y1:y(v), y2:y(v), stroke: v ? 'var(--grid)' : 'var(--axis)'}, svg);
+    txt(svg, ml-6, y(v)+4, `${v} год`, {'text-anchor':'end'});
+  }
+  const labelEvery = Math.ceil(days.length / Math.max(1, Math.floor((W-ml-mr)/56)));
+  days.forEach((d, i) => {
+    const p = M.per[d], cx = ml + bw*i + bw/2, x = cx - w/2;
+    drawStack(svg, x, w, y(0), y(p.act/3600), y(p.dur/3600), p.act > 0, p.idle > 0);
+    if (i % labelEvery === 0) txt(svg, cx, H-mb+16, fmtDay(d), {'text-anchor':'middle'});
+    const hit = el('rect', {class:'hit', x: ml + bw*i, y: mt, width: bw, height: H-mt-mb}, svg);
+    hover(hit, fmtDay(d) + (p.src & 2 ? (p.src & 1 ? ' · частково з логів' : ' · з логів') : ''), p.dur ? [
+      `Відстежено: ${fmtHL(p.dur)}`, `Активно: ${fmtHL(p.act)} (${pct(p.act, p.dur)})`, `Неактивно: ${fmtHL(p.idle)}`,
+      `З ${fmtClock(p.first)} до ${fmtClock(p.last)}`, `Клавіш: ${fmtN(p.keys)}, кліків: ${fmtN(p.clicks)}`] : ['Немає даних']);
+  });
+  if (M.worked.length) {
+    const avg = sum(M.worked.map(d => M.per[d]), 'dur')/M.worked.length/3600;
+    el('line', {x1:ml, x2:W-mr, y1:y(avg), y2:y(avg), stroke:'var(--text-secondary)', 'stroke-dasharray':'4 4', 'stroke-width':1.5, 'pointer-events':'none'}, svg);
+    txt(svg, W-mr, y(avg)-5, `сер. ${fmtH(avg*3600)}`, {'text-anchor':'end', class:'ink'});
+  }
+}
+
+// ---------- 5-min map ----------
+// пари «блокування → розблокування» по всіх подіях підряд (сон може тривати через північ):
+// [початок, кінець] у хвилинах за годинником від початку епохи - для малювання, справжня тривалість у хвилинах - з урахуванням зсуву
+const absMin = iso => dayNum(iso.slice(0,10))*1440 + minOfDay(iso);
+const absLabel = (am, d) => { const dd = Math.floor(am/1440) - dayNum(d); return fmtClock(am - Math.floor(am/1440)*1440) + (dd ? ` (${dd > 0 ? '+' : ''}${dd} дн.)` : ''); };
+const LOCKS = (() => {
+  const out = []; let open = null;
+  for (const [iso, kind] of D.power) {
+    if (kind === 'Screen Lock' || kind === 'Suspend') { if (!open) open = [absMin(iso), kind, Date.parse(iso)]; }
+    else if ((kind === 'Screen Unlock' || kind === 'Wake Up') && open) { out.push([open[0], absMin(iso), open[1], (Date.parse(iso) - open[2]) / 60000]); open = null; }
+  }
+  return out;
+})();
+
+function renderMap(M) {
+  const host = document.getElementById('map'); host.replaceChildren();
+  const leg = document.getElementById('mapLegend'); leg.replaceChildren();
+  ['0–20%','20–40%','40–60%','60–80%','80–100%'].forEach((l,i) => { const s = h('span'); const ic = h('i'); ic.style.background = SEQ[i]; s.append(ic, l + ' активно'); leg.append(s); });
+  const ls = h('span'); const li = h('i', {class:'line'}); li.style.background = 'var(--lock)'; ls.append(li, 'екран заблоковано'); leg.append(ls);
+  const days = M.days; if (!days.length) return;
+  const W = host.clientWidth || 900, rowH = 16, ml = 62, mr = 8, mt = 18;
+  const H = mt + days.length*rowH + 4;
+  let lo = 24*60, hi = 0;
+  for (const d of M.withData) { lo = Math.min(lo, M.per[d].first); hi = Math.max(hi, M.per[d].last); }
+  lo = Math.min(8*60, Math.floor(lo/60)*60); hi = Math.max(19*60, Math.ceil(hi/60)*60);
+  const x = m => ml + (W-ml-mr) * (m - lo)/(hi - lo);
+  const svg = el('svg', {viewBox:`0 0 ${W} ${H}`, height: H}, host);
+  for (let m = lo; m <= hi; m += 60) {
+    el('line', {x1:x(m), x2:x(m), y1:mt-4, y2:H, stroke:'var(--grid)'}, svg);
+    if ((m/60) % ((hi-lo)/60 > 14 ? 2 : 1) === 0) txt(svg, x(m), mt-7, `${(m/60) % 24}:00`, {'text-anchor':'middle'});
+  }
+  const row = Object.fromEntries(days.map((d,i) => [d, i]));
+  days.forEach((d,i) => txt(svg, ml-8, mt + i*rowH + rowH/2 + 4, fmtDay(d), {'text-anchor':'end', class: M.per[d].dur ? 'ink' : ''}));
+  // періоди блокування; кожне малюємо лише в ті дні, яких воно торкається
+  for (const [a, b, kind, realMin] of LOCKS) for (let n = Math.floor(a/1440); n <= Math.floor((b - 1e-9)/1440); n++) {
+    const d = dayStr(n); if (row[d] == null) continue;
+    const d0 = n*1440, s0 = Math.max(a, d0) - d0, s1 = Math.min(b, d0 + 1440) - d0;
+    if (s1 <= s0) continue;
+    const x1 = x(Math.max(s0, lo)), x2 = x(Math.min(s1, hi));
+    if (x2 <= x1) continue;
+    const yy = mt + row[d]*rowH + rowH/2;
+    const ln = el('line', {x1, x2, y1:yy, y2:yy, stroke:'var(--lock)', 'stroke-width':2, 'stroke-linecap':'round'}, svg);
+    hover(ln, fmtDay(d), [`${kind === 'Suspend' ? 'Сон' : 'Блокування'}: ${absLabel(a, d)}–${absLabel(b, d)}`, `Тривалість: ${fmtHL(realMin*60)}`]);
+  }
+  for (const [iso, dur, act, idle, keys, clicks] of M.ivs) {
+    const d = iso.slice(0,10), m0 = minOfDay(iso);
+    const share = dur ? act/dur : 0, bin = Math.min(4, Math.floor(share*5));
+    const xx = x(m0), ww = Math.max(1, x(m0 + dur/60) - xx - 1);
+    const r = el('rect', {x: xx, y: mt + row[d]*rowH + 2, width: ww, height: rowH-4, rx: 1.5, fill: SEQ[bin]}, svg);
+    hover(r, `${fmtDay(d)}, ${fmtClock(m0)}–${fmtClock(m0+dur/60)}`, () => [`Активно: ${fmtHL(act)} з ${fmtHL(dur)} (${pct(act, dur || 1)})`, `Клавіш: ${keys}, кліків: ${clicks}`]);
+  }
+}
+
+// ---------- hours of day ----------
+function renderHours(M) {
+  const host = document.getElementById('hours'); host.replaceChildren();
+  const n = M.worked.length; if (!n) return empty(host);
+  const act = new Array(24).fill(0), idle = new Array(24).fill(0);
+  for (const d of M.worked) for (let i = 0; i < 24; i++) { act[i] += M.per[d].hAct[i]/60/n; idle[i] += M.per[d].hIdle[i]/60/n; }
+  let lo = 23, hi = 0; for (let i = 0; i < 24; i++) if (act[i] + idle[i] > 0.5) { lo = Math.min(lo, i); hi = Math.max(hi, i); }
+  if (lo > hi) { lo = 8; hi = 19; }
+  const hrs = []; for (let i = lo; i <= hi; i++) hrs.push(i);
+  stackedBars(host, hrs.map(i => ({label: `${i}`, a: act[i], b: idle[i], tipTitle: `${i}:00–${(i+1) % 24}:00`,
+      tip: [`Активно: ${Math.round(act[i])} хв`, `Неактивно: ${Math.round(idle[i])} хв`]})), 60, 'хв');
+}
+
+// ---------- weekdays ----------
+function renderWeekday(M) {
+  const host = document.getElementById('weekday'); host.replaceChildren();
+  const g = {}; for (const d of M.worked) { const w = dayOfWeek(d); (g[w] = g[w] || []).push(M.per[d]); }
+  const items = WD_ORDER.filter(w => g[w]).map(w => {
+    const L = g[w], a = sum(L, 'act')/L.length/3600, b = sum(L, 'idle')/L.length/3600;
+    return {label: WD[w], a, b, tipTitle: `${WD[w]} · ${L.length} дн.`, tip: [`Активно: ${fmtHL(a*3600)}`, `Неактивно: ${fmtHL(b*3600)}`, `Разом: ${fmtHL((a+b)*3600)}`]};
+  });
+  if (!items.length) return empty(host);
+  stackedBars(host, items, null, 'год');
+}
+
+function stackedBars(host, items, fixedMax, unit) {
+  const W = host.clientWidth || 500, H = 200, ml = 40, mr = 6, mt = 8, mb = 24;
+  const svg = el('svg', {viewBox:`0 0 ${W} ${H}`, height: H}, host);
+  const max = fixedMax || niceMax(Math.max(...items.map(i => i.a + i.b)));
+  const y = v => mt + (H-mt-mb)*(1 - v/max);
+  const ticks = 4;
+  for (let k = 0; k <= ticks; k++) { const v = max*k/ticks; el('line', {x1:ml, x2:W-mr, y1:y(v), y2:y(v), stroke: k ? 'var(--grid)' : 'var(--axis)'}, svg); txt(svg, ml-6, y(v)+4, `${+v.toFixed(1)} ${unit}`, {'text-anchor':'end'}); }
+  const bw = (W-ml-mr)/items.length, w = Math.min(40, bw*0.7);
+  items.forEach((it, i) => {
+    const cx = ml + bw*i + bw/2;
+    drawStack(svg, cx - w/2, w, y(0), y(it.a), y(it.a + it.b), it.a > 0, it.b > 0);
+    txt(svg, cx, H-mb+15, it.label, {'text-anchor':'middle'});
+    hover(el('rect', {class:'hit', x: ml+bw*i, y: mt, width: bw, height: H-mt-mb}, svg), it.tipTitle, it.tip);
+  });
+}
+
+// ---------- horizontal bar lists ----------
+function hbars(host, rows, sublabel) {
+  host.replaceChildren();
+  if (!rows.length) return empty(host);
+  const W = host.clientWidth || 500, rowH = 24, labelW = Math.min(220, W*0.42), valW = 56;
+  const H = rows.length*rowH;
+  const svg = el('svg', {viewBox:`0 0 ${W} ${H}`, height: H}, host);
+  const max = rows[0].v;
+  rows.forEach((r, i) => {
+    const yy = i*rowH, bw = (W - labelW - valW) * r.v/max;
+    txt(svg, 0, yy + rowH/2 + 4, r.name.length > 34 ? r.name.slice(0,33) + '…' : r.name, {class:'ink'});
+    el('path', {d: barRight(labelW, yy + 5, Math.max(2, bw), rowH - 10, 3), fill: 'var(--s1)'}, svg);
+    txt(svg, labelW + bw + 6, yy + rowH/2 + 4, fmtH(r.v), {class:'ink1'});
+    hover(el('rect', {class:'hit', x:0, y:yy, width:W, height:rowH}, svg), r.name, sublabel(r));
+  });
+}
+
+function renderApps(M) {
+  // рядок apps: [день, програма, домен, заголовок, у фокусі, активно, клавіш, кліків]
+  const rows = topBy(M.apps, r => r[1], r => ({name: r[1], v:0, act:0, keys:0, clicks:0}), [['v',4],['act',5],['keys',6],['clicks',7]], 14);
+  hbars(document.getElementById('apps'), rows,
+    r => [`У фокусі: ${fmtHL(r.v)}`, `З них активно: ${fmtHL(r.act)}`, `Клавіш: ${fmtN(r.keys)}, кліків: ${fmtN(r.clicks)}`]);
+}
+
+function renderDomains(M) {
+  const rows = topBy(M.apps, r => r[2] || null, r => ({name: r[2], v:0, act:0}), [['v',4],['act',5]], 14);
+  hbars(document.getElementById('domains'), rows, r => [`У фокусі: ${fmtHL(r.v)}`, `З них активно: ${fmtHL(r.act)}`]);
+}
+
+function renderTitles(M) {
+  const rows = topBy(M.apps, r => r[1] + '\u0001' + r[3], r => ({app: r[1], title: r[3], v:0, act:0}), [['v',4],['act',5]], 40);
+  const t = h('table'); const hr = h('tr');
+  hr.append(h('th',{},'Заголовок вікна'), h('th',{},'Програма'), h('th',{class:'n'},'У фокусі'), h('th',{class:'n'},'Активно'));
+  t.append(hr);
+  for (const r of rows) { const tr = h('tr'); const td = h('td',{class:'t', title: r.title}, r.title || '—'); tr.append(td, h('td',{},r.app), h('td',{class:'n'},fmtH(r.v)), h('td',{class:'n'},fmtH(r.act))); t.append(tr); }
+  const host = document.getElementById('titles');
+  if (rows.length) host.replaceChildren(t); else empty(host);
+}
+
+function renderSecurity(M) {
+  const host = document.getElementById('security'); host.replaceChildren();
+  const all = D.security;
+  const p = h('p'); const b = h('span', {class:'badge'}, `${M.sec.length} за обраний період`);
+  p.append(b, ` · усього в базі ${all.length}` + (all.length ? `, з ${all[0][0].slice(0,10)} до ${all[all.length-1][0].slice(0,10)}` : ''));
+  host.append(p);
+  if (!M.sec.length) return;
+  const t = h('table'); const hr = h('tr'); hr.append(h('th',{},'Коли'), h('th',{},'Тип'), h('th',{},'Опис')); t.append(hr);
+  for (const [iso, app, c] of [...M.sec].reverse()) { const tr = h('tr'); tr.append(h('td',{}, `${fmtDay(iso.slice(0,10))} ${iso.slice(11,16)}`), h('td',{},app), h('td',{},c||'')); t.append(tr); }
+  const det = h('details'); det.append(h('summary',{},'Показати список'), t); host.append(det);
+}
+
+function renderTable(M) {
+  const t = h('table'); const hr = h('tr');
+  for (const [s, n] of [['День'],['Джерело'],['Початок',1],['Кінець',1],['Відстежено',1],['Активно',1],['Неактивно',1],['Активно, %',1],['Клавіш',1],['Кліків',1]]) hr.append(h('th', n ? {class:'n'} : {}, s));
+  t.append(hr);
+  for (const d of [...M.days].reverse()) {
+    const p = M.per[d]; if (!p.dur) continue; const tr = h('tr');
+    tr.append(h('td',{},fmtDay(d) + '.' + d.slice(0,4)), h('td',{}, SRC_LABEL[p.src] || ''), h('td',{class:'n'},fmtClock(p.first)), h('td',{class:'n'},fmtClock(p.last)),
+      h('td',{class:'n'},fmtH(p.dur)), h('td',{class:'n'},fmtH(p.act)), h('td',{class:'n'},fmtH(p.idle)), h('td',{class:'n'}, pct(p.act, p.dur)),
+      h('td',{class:'n'},fmtN(p.keys)), h('td',{class:'n'},fmtN(p.clicks)));
+    t.append(tr);
+  }
+  document.getElementById('table').replaceChildren(t);
+}
+
+const GENERATED = `зібрано ${D.generated.slice(0,16).replace('T',' ')} · час: ${D.tz || ''} (UTC${D.generated.slice(19)})`;
+let lastM = null; // останній результат compute(): при зміні розміру вікна дані не перераховуємо, лише перемальовуємо
+
+function render(redrawOnly) {
+  for (const b of document.querySelectorAll('#range button')) b.setAttribute('aria-pressed', b.dataset.r === state.range);
+  if (!firstDay) {
+    document.getElementById('meta').textContent = `Даних поки немає · ${GENERATED}`;
+    for (const s of document.querySelectorAll('main > section:not(.kpis), main > .grid2')) s.hidden = true;
+    empty(document.getElementById('kpis'), 'Агент ще не записав жодного інтервалу.');
+    return;
+  }
+  const M = redrawOnly && lastM ? lastM : (lastM = compute());
+  document.getElementById('period').hidden = state.range !== 'custom';
+  const [rs, re] = rangeBounds();
+  document.getElementById('meta').textContent = `Дані ${rs === re ? 'за ' + fmtDay(rs) : `з ${fmtDay(rs)} по ${fmtDay(re)}`} · ${GENERATED}`;
+  renderKpis(M); renderDaily(M); renderMap(M); renderHours(M); renderWeekday(M);
+  renderApps(M); renderDomains(M); renderTitles(M); renderSecurity(M); renderTable(M);
+}
+
+document.getElementById('range').addEventListener('click', e => {
+  const r = e.target.closest('button'); if (!r) return;
+  if (r.dataset.r === 'custom' && state.range !== 'custom') {
+    // відкриваємо з тим періодом, що був обраний
+    [state.from, state.to] = rangeBounds();
+    clampPeriod('to');
+  }
+  state.range = r.dataset.r; render();
+});
+for (const id of ['from', 'to']) document.getElementById(id).addEventListener('change', e => {
+  if (!e.target.value) return;
+  state[id] = e.target.value; clampPeriod(id); render();
+});
+document.getElementById('wk').addEventListener('change', e => { state.weekdaysOnly = e.target.checked; render(); });
+document.getElementById('short').addEventListener('change', e => { state.skipShort = e.target.checked; render(); });
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => render(true), 150); });
+render();
+</script>
+</body>
+</html>
