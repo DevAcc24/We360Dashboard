@@ -113,7 +113,7 @@ details summary { cursor: pointer; color: var(--text-secondary); margin-top: 6px
 
   <section class="card">
     <h2>Мапа робочого часу</h2>
-    <div class="desc">Кожен рядок — день, кожна клітинка — 5 хвилин. Чим темніша клітинка, тим більша частка активного часу в ній. Сіра лінія — екран заблоковано.</div>
+    <div class="desc">Кожен рядок — день, кожна клітинка — 5 хвилин. Чим темніша клітинка, тим більша частка активного часу в ній. Сіра лінія — екран заблоковано. Якщо період довший за 31 день, карта показує лише останні 31 день, а решта графіків рахується за весь період.</div>
     <div class="legend" id="mapLegend"></div>
     <div id="map"></div>
   </section>
@@ -173,7 +173,7 @@ const WD = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
 const WD_ORDER = [1,2,3,4,5,6,0];
 const SEQ = ['var(--q1)','var(--q2)','var(--q3)','var(--q4)','var(--q5)'];
 
-const state = { range: 'all', weekdaysOnly: false, skipShort: false };
+const state = { range: '7', weekdaysOnly: false, skipShort: false };
 const SRC_LABEL = { 1: 'база', 2: 'лог', 3: 'база + лог' };
 const SHORT_DAY = 2*3600; // «короткий» день для перемикача «без коротких днів», с
 
@@ -234,11 +234,17 @@ function showTip(ev, title, lines) {
   tip.style.left = x + 'px'; tip.style.top = y + 'px';
 }
 function hideTip() { tip.style.display = 'none'; }
+// підказки для елементів графіків; обробник один на всю сторінку, а не по два на кожен елемент -
+// на довгих періодах карта по 5 хвилинах має десятки тисяч прямокутників
+const TIPS = new WeakMap();
 // lines - масив рядків або функція, яка їх поверне (тоді текст складається лише при наведенні)
-function hover(node, title, lines) {
-  node.addEventListener('mousemove', ev => showTip(ev, title, typeof lines === 'function' ? lines() : lines));
-  node.addEventListener('mouseleave', hideTip);
-}
+function hover(node, title, lines) { TIPS.set(node, [title, lines]); }
+document.addEventListener('mousemove', ev => {
+  const t = TIPS.get(ev.target);
+  if (t) showTip(ev, t[0], typeof t[1] === 'function' ? t[1]() : t[1]);
+  else if (tip.style.display === 'block') hideTip();
+});
+document.documentElement.addEventListener('mouseleave', hideTip);
 
 // ---------- data model ----------
 const allDaysWithData = [...new Set(D.intervals.map(r => r[0].slice(0,10)))].sort();
@@ -369,16 +375,19 @@ const LOCKS = (() => {
   return out;
 })();
 
+const MAP_DAYS = 31; // карта показує не більше стільки останніх днів періоду: на довгих періодах вона найважча
+
 function renderMap(M) {
   const host = document.getElementById('map'); host.replaceChildren();
   const leg = document.getElementById('mapLegend'); leg.replaceChildren();
   ['0–20%','20–40%','40–60%','60–80%','80–100%'].forEach((l,i) => { const s = h('span'); const ic = h('i'); ic.style.background = SEQ[i]; s.append(ic, l + ' активно'); leg.append(s); });
   const ls = h('span'); const li = h('i', {class:'line'}); li.style.background = 'var(--lock)'; ls.append(li, 'екран заблоковано'); leg.append(ls);
-  const days = M.days; if (!days.length) return;
+  const days = M.days.slice(-MAP_DAYS); if (!days.length) return;
+  if (days.length < M.days.length) leg.append(h('span', {}, `показано останні ${days.length} дн. з ${M.days.length}`));
   const W = host.clientWidth || 900, rowH = 16, ml = 62, mr = 8, mt = 18;
   const H = mt + days.length*rowH + 4;
   let lo = 24*60, hi = 0;
-  for (const d of M.withData) { lo = Math.min(lo, M.per[d].first); hi = Math.max(hi, M.per[d].last); }
+  for (const d of days) if (M.per[d].dur) { lo = Math.min(lo, M.per[d].first); hi = Math.max(hi, M.per[d].last); }
   lo = Math.min(8*60, Math.floor(lo/60)*60); hi = Math.max(19*60, Math.ceil(hi/60)*60);
   const x = m => ml + (W-ml-mr) * (m - lo)/(hi - lo);
   const svg = el('svg', {viewBox:`0 0 ${W} ${H}`, height: H}, host);
@@ -400,8 +409,8 @@ function renderMap(M) {
     hover(ln, fmtDay(d), [`${kind === 'Suspend' ? 'Сон' : 'Блокування'}: ${absLabel(a, d)}–${absLabel(b, d)}`, `Тривалість: ${fmtHL(realMin*60)}`]);
   }
   for (const [iso, dur, act, idle, keys, clicks] of M.ivs) {
-    const d = iso.slice(0,10), m0 = minOfDay(iso);
-    const share = dur ? act/dur : 0, bin = Math.min(4, Math.floor(share*5));
+    const d = iso.slice(0,10); if (row[d] == null) continue;
+    const m0 = minOfDay(iso), share = dur ? act/dur : 0, bin = Math.min(4, Math.floor(share*5));
     const xx = x(m0), ww = Math.max(1, x(m0 + dur/60) - xx - 1);
     const r = el('rect', {x: xx, y: mt + row[d]*rowH + 2, width: ww, height: rowH-4, rx: 1.5, fill: SEQ[bin]}, svg);
     hover(r, `${fmtDay(d)}, ${fmtClock(m0)}–${fmtClock(m0+dur/60)}`, () => [`Активно: ${fmtHL(act)} з ${fmtHL(dur)} (${pct(act, dur || 1)})`, `Клавіш: ${keys}, кліків: ${clicks}`]);
@@ -517,7 +526,24 @@ function renderTable(M) {
 const GENERATED = `зібрано ${D.generated.slice(0,16).replace('T',' ')} · час: ${D.tz || ''} (UTC${D.generated.slice(19)})`;
 let lastM = null; // останній результат compute(): при зміні розміру вікна дані не перераховуємо, лише перемальовуємо
 
+// період і перемикачі між відкриттями; довільний період не зберігаємо - лишається останній вибраний із кнопок.
+// сховище може бути недоступне - тоді просто не зберігаємо
+const PREFS_KEY = 'we360dashboard.view';
+let savedRange = state.range;
+function savePrefs() {
+  if (state.range !== 'custom') savedRange = state.range;
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({range: savedRange, weekdaysOnly: state.weekdaysOnly, skipShort: state.skipShort})); } catch {}
+}
+function loadPrefs() {
+  let p; try { p = JSON.parse(localStorage.getItem(PREFS_KEY)); } catch {}
+  if (!p || typeof p !== 'object') return;
+  if (p.range !== 'custom' && [...document.querySelectorAll('#range button')].some(b => b.dataset.r === p.range)) state.range = savedRange = p.range;
+  state.weekdaysOnly = p.weekdaysOnly === true; state.skipShort = p.skipShort === true;
+  document.getElementById('wk').checked = state.weekdaysOnly; document.getElementById('short').checked = state.skipShort;
+}
+
 function render(redrawOnly) {
+  if (!redrawOnly) savePrefs();
   for (const b of document.querySelectorAll('#range button')) b.setAttribute('aria-pressed', b.dataset.r === state.range);
   if (!firstDay) {
     document.getElementById('meta').textContent = `Даних поки немає · ${GENERATED}`;
@@ -549,6 +575,7 @@ for (const id of ['from', 'to']) document.getElementById(id).addEventListener('c
 document.getElementById('wk').addEventListener('change', e => { state.weekdaysOnly = e.target.checked; render(); });
 document.getElementById('short').addEventListener('change', e => { state.skipShort = e.target.checked; render(); });
 let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => render(true), 150); });
+loadPrefs();
 render();
 </script>
 </body>
